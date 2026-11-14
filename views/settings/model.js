@@ -55,10 +55,11 @@ export function validate(config, bounds) {
     if (aliases.has(alias.source)) issues.push(`会话别名 ${i+1}：同一来源请合并到一个条目中。`);aliases.add(alias.source);
     if (!alias.names.length) issues.push(`会话别名 ${i+1}：至少填写一个别名，或删除空条目。`);
   });
-  const labels={scan:'每轮逻辑消息数',queue_seconds:'累计排队时间',execution_seconds:'累计读取与筛选时间',queue_capacity:'等待请求容量',page_size:'每批读取条数',return_chars:'每轮返回字符数',blob_bytes:'单段数据上限',idle_seconds:'查询进程空闲回收时间'};
+  const labels={scan:'每轮逻辑消息数',private_recent_scan:'每个私聊每轮回看条数',queue_seconds:'累计排队时间',execution_seconds:'累计读取与筛选时间',queue_capacity:'等待请求容量',page_size:'每批读取条数',return_chars:'每轮返回字符数',blob_bytes:'单段数据上限',idle_seconds:'查询进程空闲回收时间'};
   for (const [key,[min,max]] of Object.entries(bounds || {})) {
     const value=config.limits[key];
     if (!Number.isFinite(value) || value<min || value>max) issues.push(`${labels[key]||'资源限额'}须在 ${min} 到 ${max} 之间。`);
+    else if (key==='private_recent_scan' && !Number.isInteger(value)) issues.push('每个私聊每轮回看条数必须为整数。');
   }
   return [...new Set(issues)];
 }

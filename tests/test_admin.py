@@ -113,3 +113,15 @@ class EditorTests(unittest.IsolatedAsyncioTestCase):
         cfg=defaults();cfg['aliases']=[{'source':'x','names':['x'*300000]}]
         with self.assertRaises(AdminError) as err:normalize(cfg)
         self.assertEqual(err.exception.status,413)
+
+    async def test_private_recent_setting_round_trip_preserves_permissions(self):
+        state = await self.state()
+        self.assertEqual(state['config']['limits']['private_recent_scan'], 50)
+        self.assertEqual(state['limits']['private_recent_scan'], [1, 2000])
+        readers = copy.deepcopy(state['config']['readers'])
+        state['config']['limits']['private_recent_scan'] = 75
+        saved = await self.editor.save('admin', PLUGIN_NAME,
+            {'revision': state['revision'], 'config': state['config']})
+        self.assertEqual(saved['config']['limits']['private_recent_scan'], 75)
+        self.assertEqual((await self.state())['config']['readers'], readers)
+        self.assertEqual(self.resets, 1)

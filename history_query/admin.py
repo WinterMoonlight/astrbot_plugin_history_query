@@ -13,9 +13,9 @@ from .metadata import Metadata
 
 
 PLUGIN_NAME = "astrbot_plugin_history_query"
-LIMIT_FIELDS = ("scan", "queue_seconds", "execution_seconds", "queue_capacity", "page_size",
+LIMIT_FIELDS = ("scan", "private_recent_scan", "queue_seconds", "execution_seconds", "queue_capacity", "page_size",
                 "return_chars", "blob_bytes", "idle_seconds")
-LIMIT_RANGES = {"scan": (1, 2000), "queue_seconds": (0.1, 15), "execution_seconds": (0.1, 15),
+LIMIT_RANGES = {"scan": (1, 2000), "private_recent_scan": (1, 2000), "queue_seconds": (0.1, 15), "execution_seconds": (0.1, 15),
                 "queue_capacity": (1, 16), "page_size": (1, 50), "return_chars": (1000, 24000),
                 "blob_bytes": (16384, 4194304), "idle_seconds": (5, 120)}
 COLLECTION_FIELDS = {

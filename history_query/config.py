@@ -75,6 +75,7 @@ class ReaderRule:
 @dataclass(frozen=True)
 class Limits:
     scan: int = 500
+    private_recent_scan: int = 50
     queue_seconds: float = 5.0
     execution_seconds: float = 5.0
     queue_capacity: int = 4
@@ -134,11 +135,11 @@ class Settings:
                 aliases[source.key] = tuple(sorted(strings(item.get("names", []))))
             changes = {}
             ranges = {
-                "scan": (1, 2000), "queue_seconds": (0.1, 15), "execution_seconds": (0.1, 15),
+                "scan": (1, 2000), "private_recent_scan": (1, 2000), "queue_seconds": (0.1, 15), "execution_seconds": (0.1, 15),
                 "queue_capacity": (1, 16), "page_size": (1, 50), "return_chars": (1000, 24000),
                 "blob_bytes": (16384, 4 * 1024 * 1024), "idle_seconds": (5, 120),
             }
-            integers = {"scan", "queue_capacity", "page_size", "return_chars", "blob_bytes"}
+            integers = {"scan", "private_recent_scan", "queue_capacity", "page_size", "return_chars", "blob_bytes"}
             for key, value in raw.get("limits", {}).items():
                 if key not in ranges:
                     continue  # schema UI may add harmless presentation metadata

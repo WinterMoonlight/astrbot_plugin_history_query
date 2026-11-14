@@ -111,6 +111,12 @@
         "type": "int",
         "default": 500
       },
+      "private_recent_scan": {
+        "description": "每个私聊每轮回看条数",
+        "type": "int",
+        "default": 50,
+        "hint": "可填 1–2000，默认 50。重复读取和上下文补读共同计数，实际仍受每轮总条数、时间和返回字符限制。"
+      },
       "queue_seconds": {
         "description": "每轮累计排队秒数",
         "type": "float",

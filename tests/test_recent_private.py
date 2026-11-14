@@ -2,6 +2,8 @@
 import json
 import unittest
 
+from history_query.config import Settings
+from history_query.service import Service
 from tests import test_service as support
 
 
@@ -17,6 +19,45 @@ class RecentPrivateTests(unittest.IsolatedAsyncioTestCase):
         content = [{'role': 'user', 'content': f'synthetic-{peer}-{i:03}'} for i in range(rows)]
         self.write(lambda db: db.execute('INSERT INTO conversations VALUES (?,?,?,?,?,?)',
             (number, f'doc-{number}', platform, f'{platform}:FriendMessage:{peer}', json.dumps(content), updated)))
+
+    async def configure_window(self, value, total=500):
+        await self.service.close()
+        self.raw['limits'] = {'private_recent_scan': value, 'scan': total}
+        self.service = Service(self.context, lambda: Settings.parse(self.raw), self.path, self.root / 'audit')
+        self.event, self.turn = self.make_turn()
+
+    async def test_configured_window_is_used_and_total_limit_still_applies(self):
+        self.write(lambda db: db.execute('DELETE FROM conversations'))
+        self.private('11', rows=120)
+        for value, total, expected in ((10, 500, 10), (75, 500, 75), (75, 40, 40)):
+            with self.subTest(value=value, total=total):
+                await self.configure_window(value, total)
+                source = await self.source('11')
+                result = await self.call('search', {'source_refs': [source], 'keywords': ['absent']})
+                self.assertEqual(result['coverage'][0]['scanned'], expected, result)
+                self.assertEqual(result['private_read_policy']['per_source_per_turn_scan_limit'], value)
+                self.assertEqual(self.turn.rows_left, total - expected)
+
+    async def test_configured_window_also_limits_context_reads(self):
+        self.write(lambda db: db.execute('DELETE FROM conversations'))
+        self.private('11', rows=20)
+        await self.configure_window(4)
+        source = await self.source('11')
+        result = await self.call('search', {'source_refs': [source], 'limit': 2})
+        context_args = {'record_ref': result['records'][1]['record_ref'], 'radius': 1}
+        refused = await self.call('context', context_args)
+        self.assertEqual(refused['status'], 'budget_exhausted')
+        event, turn = self.make_turn(text='继续补读')
+        accepted = await self.call('context', context_args, event, turn)
+        self.assertEqual(accepted['status'], 'context')
+        self.assertEqual(turn.private_scanned['qq-a:FriendMessage:11'], 3)
+
+    async def test_small_private_window_does_not_limit_group_search(self):
+        await self.configure_window(2)
+        source = await self.source('英语群')
+        result = await self.call('search', {'source_refs': [source], 'keywords': ['absent'], 'start_time': '2026-11-14'})
+        self.assertGreater(result['coverage'][0]['scanned'], 2)
+        self.assertFalse(self.turn.private_scanned)
 
     async def test_catalog_lists_existing_authorized_sessions_not_all_contacts(self):
         self.private('12')

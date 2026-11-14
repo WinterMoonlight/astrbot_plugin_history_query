@@ -143,7 +143,7 @@ function aliases() {
 
 function limits() {
   const values=state.draft.limits;
-  const fields=[['scan','每轮逻辑消息数','多个会话、频率采样和上下文补读共同使用。',1],['page_size','每批读取条数','来源之间轮流分批；某处查完后，额度留给其他来源。',1],['queue_seconds','累计排队时间（秒）','整轮累计，不因多次调用而重置。',0.1],['execution_seconds','累计读取与筛选时间（秒）','与排队分开计算，不包含模型生成回答。',0.1],['queue_capacity','等待请求容量','执行并发固定为 1；队列已满时提示稍后重试。',1],['return_chars','每轮返回字符数','正文过长时裁剪并标记，不表示完整原文。',1],['blob_bytes','单段数据上限（字节）','1 MiB = 1,048,576 字节；超出时拒绝或跳过并说明。',1],['idle_seconds','查询进程空闲回收（秒）','普通聊天不会启动查询进程；空闲后自动释放。',1]];
+  const fields=[['scan','每轮逻辑消息数','多个会话、频率采样和上下文补读共同使用。',1],['private_recent_scan','每个私聊每轮回看条数','默认 50，可填 1–2000。重复读取与上下文补读共同计数，实际仍受总条数、时间和返回字符限制。',1],['page_size','每批读取条数','来源之间轮流分批；某处查完后，额度留给其他来源。',1],['queue_seconds','累计排队时间（秒）','整轮累计，不因多次调用而重置。',0.1],['execution_seconds','累计读取与筛选时间（秒）','与排队分开计算，不包含模型生成回答。',0.1],['queue_capacity','等待请求容量','执行并发固定为 1；队列已满时提示稍后重试。',1],['return_chars','每轮返回字符数','正文过长时裁剪并标记，不表示完整原文。',1],['blob_bytes','单段数据上限（字节）','1 MiB = 1,048,576 字节；超出时拒绝或跳过并说明。',1],['idle_seconds','查询进程空闲回收（秒）','普通聊天不会启动查询进程；空闲后自动释放。',1]];
   return `<div class="section"><div class="toolbar"><div><h3>查询资源预算</h3><p>建议先使用默认值，再根据实测调整。</p></div><button type="button" class="small" data-action="reset-limits">恢复默认额度</button></div>
     <div class="grid">${fields.map(([key,label,help,step])=>{const bounds=state.snapshot.limits[key];return field(label,`limits.${key}`,values[key],help,`type="number" min="${bounds[0]}" max="${bounds[1]}" step="${step}"`);}).join('')}</div>
     <p class="inline-note">保存后会回收当前查询运行状态；旧引用需重新获取。5 秒是触发中止的预算，必要清理另有少量开销。</p></div>

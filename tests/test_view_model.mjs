@@ -16,4 +16,10 @@ assert.throws(()=>model.setPath(cfg,'readers.0.__proto__.injected','bad'));
 const cloned=model.clone(cfg);cloned.readers[0].groups.push('qq-main:GroupMessage:456');assert.equal(cfg.readers[0].groups.length,1);
 cfg.readers.push(model.clone(cfg.readers[0]));assert.ok(model.validate(cfg,{scan:[1,2000]}).some(v=>v.includes('重复')));
 cfg.readers.pop();cfg.limits.scan=-1;assert.ok(model.validate(cfg,{scan:[1,2000]}).length);
+cfg.limits.private_recent_scan=75;
+assert.deepEqual(model.validate(cfg,{private_recent_scan:[1,2000]}),[]);
+for (const value of [0,2001,1.5]) {
+  cfg.limits.private_recent_scan=value;
+  assert.ok(model.validate(cfg,{private_recent_scan:[1,2000]}).some(issue=>issue.includes('回看条数')));
+}
 console.log('View model checks passed: escaping, source validation, duplicate checks, independent drafts and safe field paths.');

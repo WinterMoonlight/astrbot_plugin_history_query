@@ -133,6 +133,7 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         await self.begin()
         original=self.plugin.service
         cfg=state['config'];cfg['limits']['page_size']=10
+        cfg['limits']['private_recent_scan']=75
         payload={'revision':state['revision'],'config':cfg}
         async def body():return json.dumps(payload).encode()
         request.body=body
@@ -143,3 +144,5 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.plugin.service)
         self.assertTrue(original.closed)
         self.assertIs(self.runner.tool_executor,Executor)
+        await self.begin()
+        self.assertEqual(self.plugin.service.worker.limits.private_recent_scan,75)

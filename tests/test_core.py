@@ -21,6 +21,15 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(QueryError):
             Principal.from_event(Event(), Settings.parse({}))
 
+    def test_private_recent_limit_defaults_and_validates_integers(self):
+        self.assertEqual(Settings.parse(config()).limits.private_recent_scan, 50)
+        for value in (1, 20, 75, 2000):
+            raw = config(); raw['limits'] = {'private_recent_scan': value}
+            self.assertEqual(Settings.parse(raw).limits.private_recent_scan, value)
+        for value in (0, -1, 2001, 3.5, '50', True):
+            raw = config(); raw['limits'] = {'private_recent_scan': value}
+            with self.subTest(value=value), self.assertRaises(QueryError): Settings.parse(raw)
+
     def test_platform_bot_user_and_chat_are_independent(self):
         for event in [Event(platform="qq-b", bot="901"), Event(bot="901"), Event(user="8"), Event(group="100")]:
             with self.subTest(event=event.__dict__), self.assertRaises(QueryError):
