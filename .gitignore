@@ -1,0 +1,53 @@
+# Python and local environments
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local runtime state, histories, logs and backups
+.local/
+data/
+logs/
+backups/
+*.log
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.dump
+*.bak
+
+# Credentials and machine-specific settings
+.env
+.env.*
+!.env.example
+.ssh/
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Editor/OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
