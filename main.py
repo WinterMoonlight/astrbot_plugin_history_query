@@ -1,6 +1,7 @@
 """AstrBot v4.29.4 integration. No history capture, sending or model calls."""
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import astrbot
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
+from astrbot.api.web import error_response, json_response, request
 from astrbot.core.agent.tool import FunctionTool, ToolSet
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
@@ -16,6 +18,7 @@ from .history_query.errors import QueryError
 from .history_query.gate import SUPPORTED_VERSIONS, attach, owns
 from .history_query.service import Service
 from .history_query.state import Principal, Turn
+from .history_query.admin import AdminError, ConfigEditor, PLUGIN_NAME
 
 
 TOOL_DEFINITIONS = {
@@ -63,6 +66,8 @@ class HistoryQueryPlugin(Star):
         self.closed = False
         self.setup_error = None
         self.last_warning = None
+        self.reconfiguring = False
+        self.view_error = None
         self.tools = [HistoryTool(self, action) for action in TOOL_DEFINITIONS]
         self.wrapper_type = None
         try:
@@ -77,6 +82,18 @@ class HistoryQueryPlugin(Star):
         except Exception:
             self.setup_error = "查询工具注册或宿主接口不兼容，历史查询未启用。"
             logger.warning(self.setup_error)
+        self.editor = ConfigEditor(self.config, context, astrbot.__version__, self.view_status,
+                                   self.persist_view_settings, self.apply_view_settings, lambda: self.closed)
+        try:
+            for endpoint, handler, methods in [
+                ("state", self.view_state, ["GET"]), ("save", self.view_save, ["POST"]),
+                ("identify", self.view_identify, ["GET"]), ("groups", self.view_groups, ["GET"]),
+            ]:
+                context.register_web_api(f"/{PLUGIN_NAME}/admin/{endpoint}", handler, methods,
+                                         "授权历史查询管理视图")
+        except Exception:
+            self.view_error = "管理视图接口未注册，请使用原插件配置页或重新加载插件。"
+            logger.warning(self.view_error)
 
     def policy(self):
         return Settings.parse(self.config)
@@ -86,12 +103,91 @@ class HistoryQueryPlugin(Star):
             logger.warning(f"history_query disabled for this call: {code}")
             self.last_warning = code
 
+    def view_status(self):
+        service = self.service
+        worker = service.worker if service else None
+        worker_state = "未启动"
+        if worker and worker.process and worker.process.returncode is None:
+            worker_state = "查询中" if worker.inflight else "空闲待命"
+        return {"query_enabled": self.config.get("enabled") is True,
+                "active_queries": int(bool(service and service.scheduler.slot.locked())),
+                "queued_queries": service.scheduler.waiting if service else 0,
+                "worker_state": worker_state, "runtime_error": self.setup_error or self.last_warning,
+                "reconfiguring": self.reconfiguring}
+
+    async def persist_view_settings(self, config):
+        if self.closed:
+            raise AdminError("插件正在卸载，请刷新页面。", 503)
+        saver = getattr(self.config, "save_config_async", None)
+        if callable(saver):
+            return await saver(config)
+        saver = getattr(self.config, "save_config", None)
+        if not callable(saver):
+            raise AdminError("当前宿主不支持保存插件配置。", 503)
+        await asyncio.to_thread(saver, config)
+        return True
+
+    async def apply_view_settings(self):
+        self.reconfiguring = True
+        try:
+            for _, turn, binding in self.active.values():
+                binding.close(restore=not turn.locked)
+            self.active.clear()
+            old, self.service = self.service, None
+            if old:
+                await old.close()
+            self.last_warning = None
+            return None
+        except Exception:
+            self.setup_error = "配置已保存，但查询进程回收失败。请重新加载插件后再查询。"
+            return self.setup_error
+        finally:
+            self.reconfiguring = False
+
+    async def view_state(self):
+        try:
+            return json_response(await self.editor.get(request.username, request.plugin_name))
+        except AdminError as exc:
+            return error_response(str(exc), status_code=exc.status)
+        except Exception:
+            return error_response("无法读取管理配置，请从 AstrBot 插件视图重新打开。", status_code=500)
+
+    async def view_save(self):
+        try:
+            self.editor.authorize(request.username, request.plugin_name)
+            raw = await request.body()
+            if len(raw) > 262144:
+                raise AdminError("保存内容超过 256 KiB。", 413)
+            try:
+                payload = json.loads(raw)
+            except (ValueError, RecursionError) as exc:
+                raise AdminError("保存内容不是有效 JSON。") from exc
+            return json_response(await self.editor.save(request.username, request.plugin_name, payload))
+        except AdminError as exc:
+            return error_response(str(exc), status_code=exc.status)
+        except Exception:
+            return error_response("保存未完成，请刷新核对当前配置。", status_code=500)
+
+    async def view_identify(self):
+        try:
+            return json_response(await self.editor.identify(request.username, request.plugin_name,
+                                                            request.query.get("platform_id", "")))
+        except AdminError as exc:
+            return error_response(str(exc), status_code=exc.status)
+
+    async def view_groups(self):
+        try:
+            return json_response(await self.editor.groups(request.username, request.plugin_name,
+                                                          request.query.get("platform_id", "")))
+        except AdminError as exc:
+            return error_response(str(exc), status_code=exc.status)
+
     @filter.on_llm_request()
     async def filter_tools(self, event: AstrMessageEvent, req):
         usable = False
         try:
             Principal.from_event(event, self.policy())
-            usable = not self.closed and not self.setup_error and astrbot.__version__ in SUPPORTED_VERSIONS
+            usable = not self.closed and not self.reconfiguring and not self.setup_error and astrbot.__version__ in SUPPORTED_VERSIONS
         except QueryError:
             pass
         if not usable and getattr(req, "func_tool", None):
@@ -100,7 +196,7 @@ class HistoryQueryPlugin(Star):
 
     @filter.on_agent_begin()
     async def begin(self, event: AstrMessageEvent, run_context):
-        if self.closed or self.setup_error:
+        if self.closed or self.reconfiguring or self.setup_error:
             return
         try:
             settings = self.policy()
@@ -144,7 +240,7 @@ class HistoryQueryPlugin(Star):
 
     async def invoke(self, action, event, arguments):
         item = self.active.get(id(event))
-        if self.closed or self.service is None or item is None or item[0] is not event:
+        if self.closed or self.reconfiguring or self.service is None or item is None or item[0] is not event:
             return json.dumps({"status": "unavailable", "message": "当前轮次没有有效的历史查询接入或权限；其他功能不受影响。"}, ensure_ascii=False)
         return await self.service.invoke(action, event, item[1], arguments)
 

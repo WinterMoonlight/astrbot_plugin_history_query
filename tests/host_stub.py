@@ -48,16 +48,17 @@ class SQLiteDatabase:
 
 
 class Context(MetadataContext):
-    def __init__(self, path): super().__init__(path); self.manager = Manager()
+    def __init__(self, path): super().__init__(path); self.manager = Manager(); self.web_apis = []
     def get_db(self): return SQLiteDatabase(self.path)
     def get_llm_tool_manager(self): return self.manager
     def add_llm_tools(self, *tools): self.manager.tools.extend(tools)
+    def register_web_api(self, *args): self.web_apis.append(args)
 
 
 @contextmanager
 def host(data_path, real_tool_types=None, permission_wrapper=None):
     saved = {key: value for key, value in sys.modules.items() if key == "astrbot" or key.startswith("astrbot.") or key.startswith("_history_test_plugin")}
-    names = ["astrbot", "astrbot.api", "astrbot.api.event", "astrbot.api.star", "astrbot.core", "astrbot.core.agent",
+    names = ["astrbot", "astrbot.api", "astrbot.api.event", "astrbot.api.star", "astrbot.api.web", "astrbot.core", "astrbot.core.agent",
              "astrbot.core.agent.tool", "astrbot.core.utils", "astrbot.core.utils.astrbot_path",
              "astrbot.core.provider", "astrbot.core.provider.func_tool_manager", "astrbot.core.pipeline",
              "astrbot.core.pipeline.process_stage", "astrbot.core.pipeline.process_stage.follow_up",
@@ -66,6 +67,10 @@ def host(data_path, real_tool_types=None, permission_wrapper=None):
         module = types.ModuleType(name); module.__path__ = []; sys.modules[name] = module
     astro = sys.modules["astrbot"]; astro.__version__ = "4.29.4"
     api = sys.modules["astrbot.api"]; api.AstrBotConfig = dict; api.logger = NS(warning=lambda *a: None)
+    web = sys.modules["astrbot.api.web"]
+    web.request = NS(username=None, plugin_name=None, query={})
+    web.json_response = lambda value, status_code=200: NS(data=value, status_code=status_code)
+    web.error_response = lambda message, status_code=400: NS(data={"status":"error","message":message},status_code=status_code)
     def decorator(): return lambda function: function
     event = sys.modules["astrbot.api.event"]
     event.AstrMessageEvent = object; event.filter = NS(on_llm_request=decorator, on_agent_begin=decorator, on_agent_done=decorator)

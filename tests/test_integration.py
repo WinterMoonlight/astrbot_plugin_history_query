@@ -107,3 +107,39 @@ class EntryTests(unittest.IsolatedAsyncioTestCase):
         await self.begin()
         self.assertIs(self.runner.tool_executor, Executor)
         self.assertFalse(self.plugin.active)
+
+    async def test_view_routes_registered_but_not_as_llm_tools(self):
+        routes={args[0]:args[2] for args in self.context.web_apis}
+        self.assertEqual(len(routes),4)
+        self.assertEqual(routes['/astrbot_plugin_history_query/admin/save'],['POST'])
+        self.assertEqual(len(self.context.manager.tools),3)
+        self.assertTrue(all('admin' not in tool.name for tool in self.context.manager.tools))
+
+    async def test_web_api_requires_host_login(self):
+        response=await self.plugin.view_state()
+        self.assertEqual(response.status_code,403)
+        self.assertFalse(self.context.calls)
+
+    async def test_view_saves_own_config_and_retires_query_runtime(self):
+        path=self.root/'plugin_config.json'
+        class SavedConfig(dict):
+            async def save_config_async(config,value):
+                config.update(value);path.write_text(json.dumps(config),encoding='utf-8');return True
+        self.plugin.config=SavedConfig(self.raw)
+        self.plugin.editor.config=self.plugin.config
+        request=self.module.request
+        request.username='dashboard-admin';request.plugin_name='astrbot_plugin_history_query'
+        state=(await self.plugin.view_state()).data
+        await self.begin()
+        original=self.plugin.service
+        cfg=state['config'];cfg['limits']['page_size']=10
+        payload={'revision':state['revision'],'config':cfg}
+        async def body():return json.dumps(payload).encode()
+        request.body=body
+        response=await self.plugin.view_save()
+        self.assertEqual(response.status_code,200,response.data)
+        self.assertTrue(response.data['saved'])
+        self.assertEqual(json.loads(path.read_text())['limits']['page_size'],10)
+        self.assertIsNone(self.plugin.service)
+        self.assertTrue(original.closed)
+        self.assertIs(self.runner.tool_executor,Executor)
