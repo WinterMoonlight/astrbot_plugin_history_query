@@ -1,6 +1,7 @@
 # 授权历史查询
 
 ![Version](https://img.shields.io/badge/version-0.3.2-blue)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![AstrBot](https://img.shields.io/badge/AstrBot-4.29.4-536dfe)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776ab)
 ![Platform](https://img.shields.io/badge/OneBot_v11-NapCat-5b6abf)
@@ -341,3 +342,9 @@ python tools/preview_view.py --port 8766
 反馈问题请前往 [Issues](https://github.com/WinterMoonlight/astrbot_plugin_history_query/issues)，附上插件与 AstrBot 版本、复现步骤和经过脱敏的错误信息。不要上传完整聊天数据库、模型密钥、SSH 凭据或私人消息。
 
 文档组织参考了 [群聊日常分析插件](https://github.com/SXP-Simon/astrbot_plugin_qq_group_daily_analysis)的功能展示、配置说明与常见问题结构。
+
+## 开源许可
+
+本项目采用 [MIT License](LICENSE)，版权归 © 2026 WinterMoonlight 所有。
+
+允许使用、修改、分发和商业使用，分发时须保留版权声明及许可证文本。软件按原样提供，不作任何担保；完整条款见 [LICENSE](LICENSE)。

@@ -8,7 +8,7 @@ root = Path(__file__).resolve().parents[1]
 version = re.search(r'^__version__ = "([^"]+)"', (root / "history_query/__init__.py").read_text(encoding="utf-8"), re.M).group(1)
 destination = root / "dist" / f"astrbot_plugin_history_query-{version}.zip"
 destination.parent.mkdir(exist_ok=True)
-files = [root / name for name in ("main.py", "metadata.yaml", "_conf_schema.json", "README.md")]
+files = [root / name for name in ("main.py", "metadata.yaml", "_conf_schema.json", "README.md", "LICENSE")]
 files.extend(sorted((root / "history_query").glob("*.py")))
 files.extend(root / "views/settings" / name for name in ("index.html", "style.css", "app.js", "model.js"))
 files.extend(root / ".astrbot-plugin/i18n" / name for name in ("zh-CN.json", "en-US.json"))
