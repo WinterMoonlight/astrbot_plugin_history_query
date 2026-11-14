@@ -151,16 +151,11 @@ class QueryPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('不是未读记录数量', result['query_budget']['meaning'])
         self.assertIn('未读总数未知', result['message'])
 
-    async def test_two_private_targets_confirmation_and_continuation_keep_scope(self):
+    async def test_two_private_targets_recent_and_continuation_keep_scope(self):
         self.second_private()
         found = await self.call('find', {'names': ['11', '12'], 'kind': 'private'})
-        pending = await self.call('search', {'source_refs': found['source_refs'],
+        result = await self.call('search', {'source_refs': found['source_refs'],
             'start_time': '2026-11-13', 'end_time': '2026-11-14'})
-        self.assertEqual(pending['status'], 'time_unknown')
-        request = pending['next_call_after_user_confirms']
-        self.assertEqual((await self.call('search', request))['status'], 'ask_user')
-        event, turn = self.make_turn(text='同意不限定日期查询这两个会话')
-        result = await self.call('search', request, event, turn)
         self.assertEqual(len(result['coverage']), 2, result)
         self.assertTrue(all(c['scanned'] > 0 for c in result['coverage']))
         event, turn = self.make_turn(text='继续')
@@ -168,12 +163,12 @@ class QueryPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(more['coverage']), 2, more)
         self.assertNotIn(more['status'], {'ask_user', 'time_unknown'})
 
-    async def test_confirmation_cannot_change_filters_or_reuse_revoked_scope(self):
+    async def test_recent_continuation_rejects_changed_filters_and_revoked_source(self):
         self.second_private()
         found = await self.call('find', {'names': ['11', '12']})
-        pending = await self.call('search', {'source_refs': found['source_refs'], 'start_time': '2026-11-13'})
-        event, turn = self.make_turn(text='同意')
-        request = pending['next_call_after_user_confirms']
+        first = await self.call('search', {'source_refs': found['source_refs'], 'start_time': '2026-11-13'})
+        event, turn = self.make_turn(text='继续')
+        request = {'continuation': first['continuation']}
         changed = await self.call('search', {**request, 'keywords': ['changed']}, event, turn)
         self.assertEqual(changed['status'], 'invalid_request')
         self.raw['readers'][0]['private_sessions'].remove('qq-a:FriendMessage:12')
@@ -181,25 +176,21 @@ class QueryPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(denied['status'], 'denied', denied)
         self.assertNotIn('records', denied)
 
-    async def test_collective_confirmation_restores_second_target_if_model_omits_it(self):
+    async def test_recent_dates_do_not_prevent_separate_preselected_private_reads(self):
         self.second_private()
         found = await self.call('find', {'names': ['11', '12']})
-        await self.call('search', {'source_refs': found['source_refs'], 'start_time': '2026-11-13'})
-        event, turn = self.make_turn(text='同意不限定日期查询这两个会话')
-        result = await self.call('search', {'source_refs': found['source_refs'][:1], 'all_dates': True}, event, turn)
-        self.assertEqual(len(result['coverage']), 2, result)
-        event, turn = self.make_turn(text='只查11，不限定日期')
-        narrower = await self.call('search', {'source_refs': found['source_refs'][:1], 'all_dates': True}, event, turn)
-        self.assertEqual(len(narrower['coverage']), 1, narrower)
+        for ref in found['source_refs']:
+            result = await self.call('search', {'source_refs': [ref], 'start_time': '2026-11-13'})
+            self.assertTrue(result['records'], result)
+        self.assertEqual(len(self.turn.scope[0]), 2)
 
-    async def test_confirmation_requires_actual_user_consent(self):
-        source = await self.source('小王')
-        pending = await self.call('search', {'source_refs': [source], 'start_time': '2026-11-13'})
-        for text in ['先别查了', '不同意不限定日期查询']:
-            event, turn = self.make_turn(text=text)
-            result = await self.call('search', pending['next_call_after_user_confirms'], event, turn)
-            self.assertEqual(result['status'], 'ask_user')
-        self.assertEqual(self.service.worker.starts, 0)
+    async def test_group_unbounded_search_still_requires_consent(self):
+        source = await self.source('英语群')
+        result = await self.call('search', {'source_refs': [source], 'all_dates': True})
+        self.assertEqual(result['status'], 'ask_user')
+        event, turn = self.make_turn(text='查询全部历史')
+        result = await self.call('search', {'source_refs': [source], 'all_dates': True}, event, turn)
+        self.assertTrue(result['records'], result)
 
     async def test_pre_resolved_targets_may_be_queried_in_separate_calls(self):
         self.write(lambda db: add_group(db, 200, '学院通知 synthetic'))

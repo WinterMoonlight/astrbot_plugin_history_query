@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Source
@@ -107,25 +107,12 @@ class Database:
         db, generation, deadline = self.open(seconds)
         try:
             op = request["op"]
-            if op == "catalog_private":
-                p = request["platform"]
-                prefix = f"{p}:FriendMessage:"
-                records = db.execute("""SELECT DISTINCT user_id FROM conversations
-                    WHERE platform_id=? AND substr(user_id,1,?)=? AND user_id>?
-                    ORDER BY user_id LIMIT ?""", (p, len(prefix), prefix, request.get("after", ""), 201)).fetchall()
-                sources = []
-                for r in records[:200]:
-                    try:
-                        s = Source.parse(r[0])
-                        if s.kind == "FriendMessage" and s.platform == p:
-                            sources.append(s.key)
-                    except ValueError:
-                        pass
-                return {"sources": sources, "more": len(records) > 200, "generation": generation}
-            source = Source.parse(request["source"])
             expected = request.get("generation")
             if expected is not None and expected != generation:
                 fail("stale", "数据库结构或文件已变化，请重新查询。")
+            if op == "catalog_private":
+                return {**self.private_catalog(db, request), "generation": generation}
+            source = Source.parse(request["source"])
             if op == "start":
                 reply = self.start(db, source, request)
             elif op == "page":
@@ -148,6 +135,37 @@ class Database:
             db.rollback()
             db.close()
 
+    def private_catalog(self, db, request):
+        p = request["platform"]
+        prefix = f"{p}:FriendMessage:"
+        size = min(200, max(1, int(request.get("limit", 200))))
+        allowed = request.get("allowed_sources")
+        where = "platform_id=:platform AND substr(user_id,1,:prefix_len)=:prefix"
+        args = {"platform": p, "prefix_len": len(prefix), "prefix": prefix,
+                "after": request.get("after", ""), "size": size + 1}
+        if allowed is not None:
+            where += " AND user_id IN (SELECT value FROM json_each(:allowed))"
+            args["allowed"] = json.dumps(allowed)
+        upper = request.get("upper")
+        if upper is None:
+            upper = db.execute(f"SELECT max(inner_conversation_id) FROM conversations WHERE {where}", args).fetchone()[0] or 0
+        args["upper"] = upper
+        records = db.execute(f"""SELECT user_id,max(updated_at) AS updated_at FROM conversations
+            WHERE {where} AND inner_conversation_id<=:upper AND user_id>:after
+            GROUP BY user_id ORDER BY user_id LIMIT :size""", args).fetchall()
+        sessions = []
+        for row in records[:size]:
+            try:
+                source = Source.parse(row["user_id"])
+                if source.kind == "FriendMessage" and source.platform == p:
+                    sessions.append({"source": source.key, "conversation_updated_at": row["updated_at"]})
+            except ValueError:
+                pass
+        return {"sources": [s["source"] for s in sessions], "sessions": sessions,
+                "more": len(records) > size, "upper": upper,
+                "after": records[min(size, len(records)) - 1]["user_id"] if records else args["after"],
+                "scanned": min(size, len(records))}
+
     def start(self, db, source, request):
         if source.kind == "GroupMessage":
             where, args = group_where(source)
@@ -157,7 +175,10 @@ class Database:
             return {"state": {"upper": upper, "before": None, "start": request.get("start", ""), "end": request["end"], "done": not upper},
                     "sampled": count, "frequency_known": count < args["sample"] or count >= 300, "high": count >= 300, "rows": [], "scanned": count}
         upper = db.execute("SELECT max(inner_conversation_id) FROM conversations WHERE platform_id=? AND user_id=?", (source.platform, source.key)).fetchone()[0] or 0
-        return {"state": {"upper": upper, "before_conv": None, "cid": None, "offset": 0, "digest": None, "done": not upper}, "rows": [], "scanned": 0}
+        snapshot = request.get("snapshot_at") or datetime.now(timezone.utc).replace(tzinfo=None).isoformat(" ")
+        return {"state": {"upper": upper, "before_conv": None, "before_updated": None,
+                "snapshot_at": snapshot, "cid": None, "offset": None, "digest": None,
+                "done": not upper}, "rows": [], "scanned": 0}
 
     def matches(self, row, request):
         terms = request.get("keywords", [])
@@ -257,18 +278,22 @@ class Database:
             if time.monotonic() >= deadline:
                 fail("timeout", "读取时间已耗尽。")
             if not state["cid"]:
-                row = db.execute("""SELECT inner_conversation_id,conversation_id FROM conversations
+                row = db.execute("""SELECT inner_conversation_id,conversation_id,coalesce(updated_at,'') AS modified FROM conversations
                   WHERE platform_id=? AND user_id=? AND inner_conversation_id<=?
-                  AND (? IS NULL OR inner_conversation_id<?) ORDER BY inner_conversation_id DESC LIMIT 1""",
-                                 (source.platform, source.key, state["upper"], state["before_conv"], state["before_conv"])).fetchone()
+                  AND coalesce(updated_at,'')<=?
+                  AND (? IS NULL OR coalesce(updated_at,'')<? OR (coalesce(updated_at,'')=? AND inner_conversation_id<?))
+                  ORDER BY coalesce(updated_at,'') DESC,inner_conversation_id DESC LIMIT 1""",
+                                 (source.platform, source.key, state["upper"], state["snapshot_at"],
+                                  state["before_updated"], state["before_updated"], state["before_updated"], state["before_conv"])).fetchone()
                 if row is None:
                     state["done"] = True
                     break
-                state.update(cid=row["conversation_id"], before_conv=row["inner_conversation_id"], offset=0, digest=None)
+                state.update(cid=row["conversation_id"], before_conv=row["inner_conversation_id"],
+                             before_updated=row["modified"], offset=None, digest=None)
             doc = self.ai_document(db, source, state["cid"])
             if doc is None or doc["content"] is None:
                 warnings.append("一个旧对话已删除、为空或超过大小限制，未读取其正文。")
-                state.update(cid=None, offset=0, digest=None)
+                state.update(cid=None, offset=None, digest=None)
                 scanned += 1  # Charge skipped document inspection against bounded work.
                 continue
             raw = doc["content"]
@@ -278,28 +303,30 @@ class Database:
             state["digest"] = doc_hash
             if not db.execute("SELECT json_valid(?)", (raw,)).fetchone()[0]:
                 warnings.append("一个旧对话格式不兼容，已跳过。")
-                state.update(cid=None, offset=0, digest=None)
+                state.update(cid=None, offset=None, digest=None)
                 scanned += 1
                 continue
             count = db.execute("SELECT json_array_length(?)", (raw,)).fetchone()[0]
             if type(count) is not int:
                 count = 0
             if count == 0:
-                state.update(cid=None, offset=0, digest=None)
+                state.update(cid=None, offset=None, digest=None)
                 scanned += 1
                 continue
-            cursor = db.execute("SELECT key,value FROM json_each(?) WHERE key>=? AND key<? ORDER BY key",
-                                (raw, state["offset"], state["offset"] + limit - scanned))
+            if state["offset"] is None:
+                state["offset"] = count - 1
+            cursor = db.execute("SELECT key,value FROM json_each(?) WHERE key<=? AND key>? ORDER BY key DESC",
+                                (raw, state["offset"], state["offset"] - (limit - scanned)))
             for entry in cursor:
                 scanned += 1
-                state["offset"] = entry["key"] + 1
+                state["offset"] = entry["key"] - 1
                 item = self.ai_record(entry["value"], entry["key"], state["cid"], source, doc_hash, request.get("bot_id", "bot"))
                 if item and self.matches(item, request):
                     rows.append(item)
                 if len(rows) >= request.get("return_limit", 50):
                     break
-            if state["offset"] >= count:
-                state.update(cid=None, offset=0, digest=None)
+            if state["offset"] < 0:
+                state.update(cid=None, offset=None, digest=None)
                 if count == 0:
                     scanned += 1
         return {"state": state, "rows": rows, "scanned": scanned, "warnings": warnings}

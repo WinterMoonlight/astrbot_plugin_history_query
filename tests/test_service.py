@@ -98,16 +98,13 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(response["records"])
         self.assertEqual(response["issue"]["code"], "not_in_group")
 
-    async def test_private_date_requires_user_confirmation(self):
+    async def test_private_dates_default_to_bounded_recent_records(self):
         source = await self.source("小王")
-        response = await self.call("search", {"source_refs": [source], "start_time": "2026-11-13", "end_time": "2026-11-14"})
-        self.assertEqual(response["status"], "time_unknown")
-        response = await self.call("search", {"source_refs": [source], "all_dates": True})
-        self.assertEqual(response["status"], "ask_user")
-        event, turn = self.make_turn(text="可以")
-        response = await self.call("search", {"source_refs": [source], "all_dates": True}, event, turn)
-        self.assertTrue(response["records"], response)
-        self.assertTrue(all(r["time"] is None for r in response["records"]))
+        result = await self.call("search", {"source_refs": [source], "start_time": "2026-11-13", "end_time": "2026-11-14"})
+        self.assertTrue(result["records"], result)
+        self.assertTrue(all(row["time"] is None for row in result["records"]))
+        self.assertIn("未按日期筛选", result["time_notice"])
+        self.assertNotIn("confirmation_ref", result)
 
     async def test_same_turn_range_expansion_rejected(self):
         source = await self.source()

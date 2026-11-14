@@ -68,6 +68,7 @@ class Turn:
     started: float = field(default_factory=time.time)
     checked_sources: set[Source] = field(default_factory=set)
     planned_sources: set[str] = field(default_factory=set)
+    private_scanned: dict[str, int] = field(default_factory=dict)
 
     @classmethod
     def create(cls, principal, event, limits):
