@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "instances": [
+    {"__template_key": "entry", "platform_id": "qq-main", "bot_id": "100000"}
+  ],
+  "readers": [
+    {
+      "__template_key": "entry",
+      "platform_id": "qq-main",
+      "user_id": "200000",
+      "groups": ["qq-main:GroupMessage:300000"],
+      "private_sessions": ["qq-main:FriendMessage:400000"],
+      "all_groups_on": [],
+      "all_private_on": []
+    }
+  ],
+  "aliases": [
+    {"__template_key": "entry", "source": "qq-main:GroupMessage:300000", "names": ["英语群"]},
+    {"__template_key": "entry", "source": "qq-main:FriendMessage:400000", "names": ["联系人示例"]}
+  ],
+  "audit_enabled": true
+}

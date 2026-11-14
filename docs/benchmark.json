@@ -1,0 +1,17 @@
+{
+  "measured_at_utc": "2026-11-14T15:44:23.416364+00:00",
+  "platform": "Windows-11-10.0.26320-SP0",
+  "python": "3.14.4",
+  "sqlite": "3.50.4",
+  "synthetic_group_rows": 3000,
+  "database_bytes": 12468224,
+  "cold_start_and_metadata_seconds": 0.16640800000095624,
+  "scan_500_seconds": 0.5541358000009495,
+  "ipc_page_calls": 20,
+  "worker_starts": 1,
+  "worker_memory": {
+    "rss_bytes": 27766784,
+    "peak_rss_bytes": 27766784
+  },
+  "scope": "Isolated Python+SQLite worker only; excludes AstrBot/NapCat/model/network; Windows result does not certify 2-core 2-GB Linux throughput."
+}

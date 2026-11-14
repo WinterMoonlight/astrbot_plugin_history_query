@@ -1,3 +1,3 @@
-"""Authorized history-query package scaffold; no data access is implemented yet."""
+"""Bounded read-only history queries for explicitly authorized AstrBot users."""
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"

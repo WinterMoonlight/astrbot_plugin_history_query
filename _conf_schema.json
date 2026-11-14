@@ -1,0 +1,157 @@
+{
+  "enabled": {
+    "description": "启用历史查询",
+    "type": "bool",
+    "default": false,
+    "hint": "先绑定平台实例与机器人 QQ，再配置查询用户。初始仅兼容经过核验的 AstrBot 4.29.4。"
+  },
+  "instances": {
+    "description": "机器人实例绑定",
+    "type": "template_list",
+    "default": [],
+    "templates": {
+      "entry": {
+        "name": "实例",
+        "display_item": "platform_id",
+        "items": {
+          "platform_id": {
+            "description": "AstrBot 平台实例 ID",
+            "type": "string",
+            "default": "",
+            "hint": "填写实例 ID，不是 aiocqhttp 平台类型。"
+          },
+          "bot_id": {
+            "description": "机器人 QQ 号",
+            "type": "string",
+            "default": "",
+            "hint": "身份不符时拒绝读取，防止实例换号后误用历史。"
+          }
+        }
+      }
+    }
+  },
+  "readers": {
+    "description": "独立查询用户白名单",
+    "type": "template_list",
+    "default": [],
+    "templates": {
+      "entry": {
+        "name": "查询用户",
+        "display_item": "user_id",
+        "items": {
+          "platform_id": {
+            "description": "查询者所在平台实例 ID",
+            "type": "string",
+            "default": ""
+          },
+          "user_id": {
+            "description": "查询者 QQ 号",
+            "type": "string",
+            "default": ""
+          },
+          "groups": {
+            "description": "允许查询的群",
+            "type": "list",
+            "default": [],
+            "hint": "每项格式：实例ID:GroupMessage:群号"
+          },
+          "private_sessions": {
+            "description": "允许查询的私聊",
+            "type": "list",
+            "default": [],
+            "hint": "每项格式：实例ID:FriendMessage:用户QQ号"
+          },
+          "all_groups_on": {
+            "description": "允许查询全部群的实例",
+            "type": "list",
+            "default": [],
+            "hint": "显式填写已绑定的实例 ID；仍检查机器人当前是否在群内。"
+          },
+          "all_private_on": {
+            "description": "允许查询全部私聊的实例",
+            "type": "list",
+            "default": [],
+            "hint": "显式填写已绑定的实例 ID；会包含其他人与机器人的已保存 AI 对话。"
+          }
+        }
+      }
+    }
+  },
+  "aliases": {
+    "description": "会话别名",
+    "type": "template_list",
+    "default": [],
+    "templates": {
+      "entry": {
+        "name": "别名",
+        "display_item": "source",
+        "items": {
+          "source": {
+            "description": "会话标识",
+            "type": "string",
+            "default": "",
+            "hint": "实例ID:GroupMessage:群号 或 实例ID:FriendMessage:用户号"
+          },
+          "names": {
+            "description": "别名列表",
+            "type": "list",
+            "default": [],
+            "hint": "例如 英语群、学院群。同名时必须由用户选择。"
+          }
+        }
+      }
+    }
+  },
+  "limits": {
+    "description": "资源限额",
+    "type": "object",
+    "items": {
+      "scan": {
+        "description": "每轮逻辑消息上限",
+        "type": "int",
+        "default": 500
+      },
+      "queue_seconds": {
+        "description": "每轮累计排队秒数",
+        "type": "float",
+        "default": 5
+      },
+      "execution_seconds": {
+        "description": "每轮累计读取与筛选秒数",
+        "type": "float",
+        "default": 5
+      },
+      "queue_capacity": {
+        "description": "最多等待请求数",
+        "type": "int",
+        "default": 4
+      },
+      "page_size": {
+        "description": "轮流读取的批大小",
+        "type": "int",
+        "default": 25
+      },
+      "return_chars": {
+        "description": "每轮工具返回字符上限",
+        "type": "int",
+        "default": 12000
+      },
+      "blob_bytes": {
+        "description": "单段历史或消息最大字节数",
+        "type": "int",
+        "default": 1048576
+      },
+      "idle_seconds": {
+        "description": "查询进程空闲回收秒数",
+        "type": "float",
+        "default": 30
+      }
+    }
+  },
+  "audit_enabled": {
+    "description": "记录查询审计元信息",
+    "type": "bool",
+    "default": true,
+    "hint": "仅查询者、工具类型、状态、数量、时间；不记录正文、完整问题或关键词。每个日志最多约1MiB，保留当前与上一份。"
+  }
+}

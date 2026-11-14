@@ -1,0 +1,23 @@
+{
+  "time_utc": "2026-11-14T15:45:13.635721+00:00",
+  "python": "3.14.4",
+  "platform": "Windows-11-10.0.26320-SP0",
+  "tests": 49,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 4.807269500000984,
+  "passed": true,
+  "scope": "Synthetic records and host-contract doubles; no server/model calls.",
+  "upstream_contract": {
+    "status": "passed",
+    "upstream": "AstrBot v4.29.4",
+    "verified": [
+      "real FunctionTool/ToolSet construction",
+      "permission wrapper denial",
+      "find and search",
+      "gate restoration"
+    ],
+    "limitation": "Host lifecycle/executor and adapter are synthetic; not a full AstrBot process."
+  }
+}

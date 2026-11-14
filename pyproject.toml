@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "astrbot-plugin-history-query"
-version = "0.1.0.dev0"
-description = "Development scaffold for authorized cross-session AstrBot history queries"
+version = "0.1.0"
+description = "Bounded, authorized cross-session AstrBot history queries"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

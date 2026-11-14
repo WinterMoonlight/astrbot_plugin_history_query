@@ -1,0 +1,4 @@
+# Only needed for the optional upstream construction/permission contract check.
+pydantic>=2.12.5
+jsonschema>=4.0
+deprecated>=1.2
