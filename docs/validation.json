@@ -1,12 +1,12 @@
 {
-  "time_utc": "2026-11-14T16:55:11.050629+00:00",
+  "time_utc": "2026-11-14T17:23:51.510491+00:00",
   "python": "3.14.4",
   "platform": "Windows-11-10.0.26320-SP0",
   "tests": 101,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
-  "seconds": 13.244392499997048,
+  "seconds": 12.900930899999366,
   "passed": true,
   "scope": "Synthetic records and host-contract doubles; no server/model calls.",
   "upstream_contract": {

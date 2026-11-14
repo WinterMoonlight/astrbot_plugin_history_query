@@ -2,7 +2,7 @@
   "views": {
     "settings": {
       "title": "History Query",
-      "description": "Manage bot instances, readers, session permissions and resource limits."
+      "description": "Choose who can search which chats and how much history to read."
     }
   }
 }

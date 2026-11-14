@@ -160,7 +160,7 @@ class ConfigEditor:
             instance = platform(instance)
             adapter = self.context.get_platform_inst(instance)
             if adapter is None or adapter.meta().name != "aiocqhttp":
-                raise AdminError("该 OneBot 实例当前不可用。")
+                raise AdminError("这个机器人连接暂时不可用，请到 AstrBot 的“机器人”页面检查连接状态。")
             async with asyncio.timeout(5):
                 data = await adapter.bot.call_action("get_login_info")
             bot = identifier(str(data.get("user_id", "")))
@@ -168,7 +168,7 @@ class ConfigEditor:
         except AdminError:
             raise
         except Exception as exc:
-            raise AdminError("暂时无法识别机器人，请检查实例连接或手动填写 QQ。", 503) from exc
+            raise AdminError("暂时无法识别机器人，请检查连接状态，或手动填写机器人 QQ 号。", 503) from exc
 
     async def groups(self, username, plugin_name, instance):
         self.authorize(username, plugin_name)
@@ -176,7 +176,7 @@ class ConfigEditor:
             settings = Settings.parse(dict(self.config))
             instance = platform(instance)
             if instance not in settings.instances:
-                raise AdminError("请先保存该实例的机器人绑定，再获取群列表。")
+                raise AdminError("请先到“连接机器人”保存这个机器人的设置，再获取群列表。")
             async with asyncio.timeout(5):
                 groups = await Metadata(self.context, settings).groups(instance)
             return {"platform_id": instance, "groups": [
@@ -185,4 +185,4 @@ class ConfigEditor:
         except AdminError:
             raise
         except Exception as exc:
-            raise AdminError("暂时无法获取群列表或机器人绑定不符，可稍后重试。", 503) from exc
+            raise AdminError("暂时无法获取群列表。请检查机器人是否在线、保存的 QQ 号是否正确，然后重试。", 503) from exc

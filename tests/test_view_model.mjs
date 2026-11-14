@@ -22,4 +22,11 @@ for (const value of [0,2001,1.5]) {
   cfg.limits.private_recent_scan=value;
   assert.ok(model.validate(cfg,{private_recent_scan:[1,2000]}).some(issue=>issue.includes('回看条数')));
 }
+// Count fields reject fractions; time limits still accept decimal seconds.
+for (const key of ['scan','page_size','queue_capacity','return_chars','blob_bytes','idle_seconds']) {
+  cfg.limits[key]=1.5;
+  assert.ok(model.validate(cfg,{[key]:[1,2000]}).some(issue=>issue.includes('整数')));
+}
+cfg.limits.execution_seconds=0.5;cfg.limits.queue_seconds=0.5;
+assert.deepEqual(model.validate(cfg,{execution_seconds:[0.1,15],queue_seconds:[0.1,15]}),[]);
 console.log('View model checks passed: escaping, source validation, duplicate checks, independent drafts and safe field paths.');
