@@ -67,6 +67,7 @@ class Turn:
     bridge: Any = None
     started: float = field(default_factory=time.time)
     checked_sources: set[Source] = field(default_factory=set)
+    planned_sources: set[str] = field(default_factory=set)
 
     @classmethod
     def create(cls, principal, event, limits):

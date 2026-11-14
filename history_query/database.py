@@ -244,7 +244,7 @@ class Database:
         return {"text": content[:self.message_chars],
                 "text_truncated": len(content) > self.message_chars or (isinstance(original, list) and len(original) > 128),
                 "sender_id": source.peer if item["role"] == "user" else bot_id,
-                "sender_name": source.peer if item["role"] == "user" else "机器人",
+                "sender_name": "" if item["role"] == "user" else "机器人",
                 "role": item["role"], "time": None, "time_basis": "unknown", "source_umo": source.key,
                 "conversation_id": cid,
                 "reference": {"cid": cid, "index": index, "hash": doc_hash}}

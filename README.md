@@ -1,6 +1,6 @@
 # 授权历史查询
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.1-blue)
 ![AstrBot](https://img.shields.io/badge/AstrBot-4.29.4-536dfe)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776ab)
 ![Platform](https://img.shields.io/badge/platform-OneBot_v11%20%2F%20NapCat-green)
@@ -12,7 +12,7 @@
 [快速开始](#quick-start) · [授权配置](#permissions) · [使用示例](#usage) · [常见问题](#faq) · [开发文档](#development)
 
 > [!NOTE]
-> **v0.2.0 新增独立管理视图。** 当前仅启用已核验的 AstrBot **4.29.4**。查询和管理接口已通过 64 个合成数据用例；新视图已完成本地交互验证，尚未完成真实宿主中的视图联调。其他版本或接入检查失败时，只停用历史查询，不影响原有功能。完整验证范围见[验证结果](docs/验证状态.md)。
+> **v0.2.1 改进私聊名称、时间提示和多会话续查。** 当前仅启用已核验的 AstrBot **4.29.4**，查询和管理接口已通过 81 个合成数据用例。独立视图在 v0.2.0 部署时已验证真实宿主加载和登录保护。其他版本或接入检查失败时，只停用历史查询，不影响原有功能。完整验证范围见[验证结果](docs/验证状态.md)。
 
 ## 能做什么
 
@@ -59,7 +59,7 @@ https://github.com/WinterMoonlight/astrbot_plugin_history_query
 python tools/package.py
 ```
 
-输出文件：`dist/astrbot_plugin_history_query-0.2.0.zip`。
+输出文件：`dist/astrbot_plugin_history_query-0.2.1.zip`。
 
 ### 3. 先配置一个群
 
@@ -147,6 +147,12 @@ python tools/package.py
 | 只查完了一部分 | 先回答已查结果，说明覆盖范围，再问是否继续 |
 | 当前时间范围内没有命中 | 说明本次范围，询问是否往前查，不自动扩大 |
 | 私聊记录无法核实日期 | 说明时间不足，询问是否改成不限定日期、按关键词查 |
+| 同意不限定日期查询多个会话 | 保留已确认的全部目标与条件，一起分批查询；续查不重复授权 |
+| 私聊只显示 QQ 号 | 优先使用会话名称；缺失时限时补查 QQ 昵称，失败才回退 QQ 号 |
+
+返回的本轮剩余读取额度不是未读历史条数。插件不统计未读记录总数，不能据此说“还有四百多条没查”。私聊结果没有可靠的逐条时间时，必须说明时间信息不足；即使正文提到“昨天”或某个时刻，也不能据此断言那就是消息的发送时间。
+
+名称用于方便阅读：会话别名、宿主保存的名称和当前 QQ 昵称都有可能与历史昵称不同。权限始终按真实平台实例、机器人及用户 ID 检查。昵称补查使用 OneBot 的[账号资料接口](https://github.com/botuniverse/onebot-11/blob/master/api/public.md#get_stranger_info-获取陌生人信息)，只查已定位且获授权的私聊对象，不拉取全体好友；每次最多等待 0.35 秒，计入原有本轮时间预算，名称缓存最多 256 项。
 
 **开始读取历史后，本轮只允许继续历史查询和上下文补读。** 新的发送、提醒等操作等待下一条明确请求；此前已启动的工作可以完成。没有开始读取历史的普通轮次，原有插件仍按原来的方式调用。
 

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import time
+from collections import OrderedDict
+
 from .config import Settings, Source
 from .errors import QueryError, fail
 
@@ -8,9 +12,10 @@ class Metadata:
     """Only metadata through the existing adapter; no history RPC or sending API."""
     def __init__(self, context, settings: Settings):
         self.context, self.settings = context, settings
+        self.names = OrderedDict()
 
     async def _api(self, instance, method, **kwargs):
-        if method not in {"get_login_info", "get_group_list"}:
+        if method not in {"get_login_info", "get_group_list", "get_stranger_info"}:
             fail("invalid_metadata_operation", "不允许的元信息请求。")
         adapter = self.context.get_platform_inst(instance)
         if adapter is None or adapter.meta().name != "aiocqhttp":
@@ -64,3 +69,36 @@ class Metadata:
                     for r in records if r.umo in keys}
         except Exception:
             return {}  # Names are convenience metadata, not authorization evidence.
+
+    async def private_name(self, source, known_name="", known_basis="session_alias"):
+        """Call only after source authorization and current bot identity checks.
+
+        Query at most one profile, never the entire friend list. This cache is
+        display-only and cannot replace access checks. No data is persisted.
+        """
+        if known_name and known_basis not in {"current_qq_nickname", "id_only"} and known_name not in {source.peer, f"私聊 {source.peer}"}:
+            return str(known_name)[:128], known_basis
+        key = (source.platform, self.settings.instances[source.platform], source.peer)
+        cached = self.names.get(key)
+        if cached and cached[0] > time.monotonic():
+            self.names.move_to_end(key)
+            return cached[1], cached[2]
+        name = ""
+        try:
+            async with asyncio.timeout(0.35):
+                data = await self._api(source.platform, "get_stranger_info",
+                                       user_id=int(source.peer), no_cache=False)
+            if isinstance(data, dict) and str(data.get("user_id")) == source.peer:
+                value = data.get("nickname")
+                if isinstance(value, str):
+                    name = " ".join(value.split())[:128]
+                    if name == source.peer:
+                        name = ""
+        except (QueryError, TimeoutError):
+            pass  # Missing display metadata does not invalidate readable history.
+        basis = "current_qq_nickname" if name else "id_only"
+        self.names[key] = (time.monotonic() + (300 if name else 30), name, basis)
+        self.names.move_to_end(key)
+        while len(self.names) > 256:
+            self.names.popitem(last=False)
+        return name, basis

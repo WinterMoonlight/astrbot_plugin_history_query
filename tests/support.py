@@ -76,6 +76,8 @@ class Context:
         self.groups = {"qq-a": {"100": "大学英语", "200": "学院群"}, "qq-b": {"100": "别的平台"}}
         self.offline = False
         self.calls = []
+        self.nicknames = {}
+        self.profile_requests = []
     def get_platform_inst(self, instance):
         async def action(method, **kwargs):
             self.calls.append((instance, method))
@@ -83,6 +85,10 @@ class Context:
                 raise ConnectionError("synthetic offline")
             if method == "get_login_info": return {"user_id": "900" if instance == "qq-a" else "901"}
             if method == "get_group_list": return [{"group_id": k, "group_name": v} for k, v in self.groups[instance].items()]
+            if method == "get_stranger_info":
+                peer = str(kwargs["user_id"])
+                self.profile_requests.append((instance, peer))
+                return {"user_id": peer, "nickname": self.nicknames.get((instance, peer), "")}
             raise AssertionError("No other RPC allowed")
         return NS(meta=lambda: NS(name="aiocqhttp"), bot=NS(call_action=action))
     def get_db(self):
